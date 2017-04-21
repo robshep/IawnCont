@@ -1,0 +1,47 @@
+#!/bin/bash
+
+function die() {
+        if [ -n "$1" ]; then echo "$1"; else echo "Usage: ${0} <container.properties>"; fi
+        exit
+}
+
+test -n "$1" || die;
+test -f "$1"  || die;
+
+source $1
+
+function isRunning(){
+        docker ps --format "{{.Names}}" | grep -q "^${CONT_NAME}$"
+}
+
+function pullVersion(){
+        if [ "$VERSION" != "latest" ]
+        then
+                echo "Pulling ${IMAGE}:${VERSION} if we don't have it already"
+        else
+                echo "Pulling ${IMAGE}:$VERSION"
+        fi
+        ( docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "^${IMAGE}:${VERSION}$" && [ "$VERSION" != "latest" ] ) || docker pull "${IMAGE}:${VERSION}"
+}
+
+function dropCont(){
+        docker ps -a --format "{{.Names}}" | grep -q "^${CONT_NAME}$" && ( docker rm "${CONT_NAME}" > /dev/null; echo "dropped old container" )
+}
+
+function linkLocal(){
+        [ "$LINK_LOCAL" == "true" ] || return;
+        MY_IP=`ifconfig | grep -E "([0-9]{1,3}\.){3}[0-9]{1,3}" | grep -v 127.0.0.1 | awk '{ print $2 }' | cut -f2 -d: | head -n1`
+        echo --add-host docker.local:${MY_IP}
+}
+
+function createCont() {
+        docker create --name "${CONT_NAME}" `linkLocal` "${CONT_OPTS[@]}" "${IMAGE}:${VERSION}" "${CONT_ARGS[@]}" > /dev/null && echo "created new container"
+}
+
+pullVersion || die "Could not find ${IMAGE}:${VERSION}"
+
+isRunning && die "Container \"${CONT_NAME}\" is running. Stop it and try again"
+
+dropCont
+
+createCont
