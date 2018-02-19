@@ -78,3 +78,16 @@ Ignore this for other process management regimes.
 3. `systemctl stop docker-container@bbtest.service`
 4. `./recreateContainer bbtest.conf` # to recreate
 5. `systemctl start docker-container@bbtest.service`
+
+## 4. Systemd & Syslog
+
+if using the systemd container template, it uses docker -a to allow signal forwarding and to stay in the foreground.  This means that in addition to there being the usual docker logs from your configured logging driver (e.g. json-file) you will also see docker container stdout & stderr passing through the hosts system logger.  I.e. on ubuntu rsyslog will dump all the containers' output to /var/log/syslog. 
+
+To supress this add the following file and restart rsyslog
+
+    # begin /etc/rsyslog.d/30-nodockersyslog.conf
+    if $programname == 'docker' then ~
+    & stop
+    # end /etc/rsyslog.d/30-nodockersyslog.conf
+
+
